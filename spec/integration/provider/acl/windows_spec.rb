@@ -53,7 +53,7 @@ describe Puppet::Type.type(:acl).provider(:windows), :if => Puppet.features.micr
   end
 
   after :each do
-    if resource[:target] && ::File.exist?(resource[:target])
+    if resource[:target] && Puppet::FileSystem::File.exist?(resource[:target])
       grant_everyone_full_access(resource[:target])
     end
   end
