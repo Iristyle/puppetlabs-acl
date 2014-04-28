@@ -5,23 +5,30 @@ require 'tmpdir'
 require 'fileutils'
 require 'puppet/util/windows/security'
 
-def grant_everyone_full_access(path)
-  path = path.gsub('/', '\\')
-  output = %x(takeown.exe /F #{path} /R /A /D Y 2>&1)
+def grant_everyone_full_access(path, recurse = false)
+#  path = path.gsub('/', '\\')
+#  output = %x(takeown.exe /F #{path} /R /A /D Y 2>&1)
 
-  if $? != 0 #check if the child process exited cleanly.
-    puts "#{path} got error #{output}"
+#  if $? != 0 #check if the child process exited cleanly.
+#    puts "#{path} got error #{output}"
+
+  file = Puppet::FileSystem::File.new(path)
+  if recurse && File.directory?(path) && ! file.symlink?
+    Dir.entries(path).each do |f|
+      if (f == '.' || f == '..')
+        # skip
+      else
+        grant_everyone_full_access(File.join(f), recurse)
+      end
+    end
   end
 
-  # sd = Puppet::Util::Windows::Security.get_security_descriptor(path)
-  # sd.dacl.allow(
-  #   'S-1-1-0', #everyone
-  #   Windows::File::FILE_ALL_ACCESS,
-  #   Windows::File::OBJECT_INHERIT_ACE | Windows::File::CONTAINER_INHERIT_ACE)
-  # begin
-  #   Puppet::Util::Windows::Security.set_security_descriptor(path, sd)
-  # rescue Exception => e
-  # end
+  sd = Puppet::Util::Windows::Security.get_security_descriptor(path)
+  sd.dacl.allow(
+    'S-1-1-0', #everyone
+    Windows::File::FILE_ALL_ACCESS,
+    Windows::File::OBJECT_INHERIT_ACE | Windows::File::CONTAINER_INHERIT_ACE)
+  Puppet::Util::Windows::Security.set_security_descriptor(path, sd)
 end
 
 RSpec.configure do |config|
