@@ -24,6 +24,9 @@ def grant_everyone_full_access(path, recurse = false)
   end
 
   sd = Puppet::Util::Windows::Security.get_security_descriptor(path)
+  denied = sd.dacl.select { |e| e.type == Puppet::Util::Windows::AccessControlEntry::ACCESS_DENIED_ACE_TYPE }
+
+  denied.each { |d| sd.dacl.remove(d) }
   sd.dacl.allow(
     'S-1-1-0', #everyone
     Windows::File::FILE_ALL_ACCESS,
