@@ -135,10 +135,18 @@ if Puppet::Util::Platform.windows?
 
     module Puppet::Util::Windows::Security
 
+      def safe_string_to_sid_ptr(sid)
+        if Puppet::Util::Windows::SID.respond_to?(:string_to_sid_ptr)
+          Puppet::Util::Windows::SID.string_to_sid_ptr(sid)
+        else
+          string_to_sid_ptr(sid)
+        end
+      end
+
       def add_access_denied_ace(acl, mask, sid, inherit = nil)
         inherit ||= NO_INHERITANCE
 
-        string_to_sid_ptr(sid) do |sid_ptr|
+        safe_string_to_sid_ptr(sid) do |sid_ptr|
           raise Puppet::Util::Windows::Error.new("Invalid SID") unless IsValidSid(sid_ptr)
 
           unless AddAccessDeniedAceEx(acl, ACL_REVISION, inherit, mask, sid_ptr)
@@ -162,8 +170,8 @@ if Puppet::Util::Platform.windows?
         with_privilege(SE_BACKUP_NAME) do
           with_privilege(SE_RESTORE_NAME) do
             open_file(path, READ_CONTROL | WRITE_DAC | WRITE_OWNER) do |handle|
-              string_to_sid_ptr(sd.owner) do |ownersid|
-                string_to_sid_ptr(sd.group) do |groupsid|
+              safe_string_to_sid_ptr(sd.owner) do |ownersid|
+                safe_string_to_sid_ptr(sd.group) do |groupsid|
                   sd.dacl.each do |ace|
                     case ace.type
                       when ACCESS_ALLOWED_ACE_TYPE

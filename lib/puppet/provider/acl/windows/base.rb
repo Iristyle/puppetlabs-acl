@@ -18,17 +18,42 @@ class Puppet::Provider::Acl
         REFRESH_SD        = true
         DO_NOT_REFRESH_SD = false
 
-        FILE_ALL_ACCESS = ::Windows::File::FILE_ALL_ACCESS
-        GENERIC_ALL = ::Windows::File::GENERIC_ALL
-        FILE_GENERIC_WRITE = ::Windows::File::FILE_GENERIC_WRITE #& ~::Windows::File::READ_CONTROL
-        GENERIC_WRITE = ::Windows::File::GENERIC_WRITE
-        FILE_GENERIC_READ = ::Windows::File::FILE_GENERIC_READ
-        GENERIC_READ = ::Windows::File::GENERIC_READ
-        FILE_GENERIC_EXECUTE = ::Windows::File::FILE_GENERIC_EXECUTE
-        GENERIC_EXECUTE = ::Windows::File::GENERIC_EXECUTE
-        DELETE = ::Windows::File::DELETE
+        FILE_ALL_ACCESS = Puppet::Util::Windows::File::FILE_ALL_ACCESS || ::Windows::File::FILE_ALL_ACCESS
+        GENERIC_ALL = Puppet::Util::Windows::File::GENERIC_ALL || ::Windows::File::GENERIC_ALL
+        FILE_GENERIC_WRITE = Puppet::Util::Windows::File::FILE_GENERIC_WRITE || ::Windows::File::FILE_GENERIC_WRITE #& ~::Windows::File::READ_CONTROL
+        GENERIC_WRITE = Puppet::Util::Windows::File::GENERIC_WRITE || ::Windows::File::GENERIC_WRITE
+        FILE_GENERIC_READ = Puppet::Util::Windows::File::FILE_GENERIC_READ || ::Windows::File::FILE_GENERIC_READ
+        GENERIC_READ = Puppet::Util::Windows::File::GENERIC_READ || ::Windows::File::GENERIC_READ
+        FILE_GENERIC_EXECUTE = Puppet::Util::Windows::File::FILE_GENERIC_EXECUTE || ::Windows::File::FILE_GENERIC_EXECUTE
+        GENERIC_EXECUTE = Puppet::Util::Windows::File::GENERIC_EXECUTE || ::Windows::File::GENERIC_EXECUTE
+        DELETE = Puppet::Util::Windows::Security::DELETE || ::Windows::File::DELETE
 
         @security_descriptor = nil
+
+        # Puppet 3.7 deprecated methods at old locations in favor of SID class
+        def name_to_sid(name)
+          if Puppet::Util::Windows::SID.respond_to?(:name_to_sid)
+            Puppet::Util::Windows::SID.name_to_sid(name)
+          else
+            Puppet::Util::Windows::Security.name_to_sid(name)
+          end
+        end
+
+        def sid_to_name(value)
+          if Puppet::Util::Windows::SID.respond_to?(:sid_to_name)
+            Puppet::Util::Windows::SID.sid_to_name(value)
+          else
+            Puppet::Util::Windows::Security.sid_to_name(value)
+          end
+        end
+
+        def valid_sid?(string_sid)
+          if Puppet::Util::Windows::SID.respond_to?(:valid_sid?)
+            Puppet::Util::Windows::SID.valid_sid?(string_sid)
+          else
+            Puppet::Util::Windows::Security.valid_sid?(string_sid)
+          end
+        end
 
         def get_current_permissions
           sd = get_security_descriptor(DO_NOT_REFRESH_SD)
@@ -46,7 +71,7 @@ class Puppet::Provider::Acl
           return {} if ace.nil?
 
           sid = ace.sid
-          identity = ace.sid_to_name(sid)
+          identity = sid_to_name(sid)
           rights = get_ace_rights_from_mask(ace)
           ace_type = get_ace_type(ace)
           child_types = get_ace_child_types(ace)
@@ -364,15 +389,15 @@ class Puppet::Provider::Acl
           # sometimes the name will come in with a SID
           # which will return nil when we call name_to_sid
           # if the user no longer exists
-          if Puppet::Util::Windows::Security.valid_sid?(name)
+          if valid_sid?(name)
             name
           else
-            Puppet::Util::Windows::Security.name_to_sid(name)
+            name_to_sid(name)
           end
          end
 
         def get_account_name(current_value)
-          name = Puppet::Util::Windows::Security.sid_to_name(get_account_id(current_value))
+          name = sid_to_name(get_account_id(current_value))
 
           name ? name : current_value
         end
